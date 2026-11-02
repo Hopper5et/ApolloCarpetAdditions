@@ -115,11 +115,12 @@ Allows to create and execute a sequence of commands with a delay.
 
 * `/macro create {name}` Creates macro.
 * `/macro delete [macro selection]` Deletes macro.
+* `/macro copy [macro selection]` Copies macro for you.
 * `/macro info [macro selection]` Displays all information about the macro.
 * `/macro list [macro selection without {name}]` Displays a list of macros belonging to the corresponding owner.
-* `/macro stop` Cancels the currently running macro.
 * `/macro run {name} {variables}` Launches a macro that you own.
 * `/macro run [macro selection without mine] {variables}` Launches other macros.  
+* `/macro stop` Cancels the currently running macro.
 
 `{variables}` is optional
 
