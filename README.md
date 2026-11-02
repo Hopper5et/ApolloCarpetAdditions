@@ -140,15 +140,15 @@ Allows to create and execute a sequence of commands with a delay.
 `/macro edit mine turnMobSwitchWithBot transfer public`
 `/macro run public turnMobSwitchWithBot`
 
-Spawns Carpet bot at 217 64 918, makes it use once and kills it.
+Spawns Carpet bot at coordinates 217 64 918, makes it use once and kills it.
 
-`/macro create say_my_name`
-`/macro edit mine say_my_name add 0t /say $name`
-`/macro edit mine say_my_name add 5s /say $right`
-`/macro run say_my_name $name=Heisenberg $right=You are goddamn right`
+`/macro create say_my_name`  
+`/macro edit mine say_my_name add 0t /say $name`  
+`/macro edit mine say_my_name add 5s /say $right`  
+`/macro run say_my_name $name=Heisenberg $right=You are goddamn right`  
 
 Makes you say "Heisenberg" and after 5 seconds "You are goddamn right".
 
 # Other:
 
-
+* Works as a server-side mod [clientcommands](https://github.com/Earthcomputer/clientcommands), allowing clients to execute commands without restrictions.
