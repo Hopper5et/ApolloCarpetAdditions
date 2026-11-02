@@ -81,7 +81,8 @@ public class Macro {
 
     public static boolean cantEdit(CommandSourceStack source, String macroOwner)  {
         return !CommandHelper.canUseCommand(source, ApolloCarpetAdditionsSettings.allowEditOtherPlayersMacros)
-                && (!source.getTextName().equals(macroOwner));
+                && !macroOwner.equals(MACRO_PUBLIC_OWNER)
+                && !source.getTextName().toLowerCase().equals(macroOwner);
     }
 
     public static List<String> listMacros(String owner) {

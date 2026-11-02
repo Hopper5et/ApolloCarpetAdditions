@@ -43,7 +43,7 @@ public class MacroCommand {
                         literal("delete"),
                         context -> delete(
                                 context,
-                                context.getSource().getTextName()
+                                context.getSource().getTextName().toLowerCase()
                         ),
                         context -> delete(
                                 context,
@@ -58,7 +58,7 @@ public class MacroCommand {
                         literal("info"),
                         context -> info(
                                 context,
-                                context.getSource().getTextName()
+                                context.getSource().getTextName().toLowerCase()
                         ),
                         context -> info(
                                 context,
@@ -69,12 +69,27 @@ public class MacroCommand {
                                 StringArgumentType.getString(context, "owner")
                         )
                 ))
+                .then(registerMacroSelector(
+                        literal("copy"),
+                        context -> copy(
+                                context,
+                                context.getSource().getTextName().toLowerCase()
+                        ),
+                        context -> copy(
+                                context,
+                                MACRO_PUBLIC_OWNER
+                        ),
+                        context -> copy(
+                                context,
+                                StringArgumentType.getString(context, "owner")
+                        )
+                ))
                 .then(literal("list")
                         .then(literal("mine")
                                 .executes(
                                         context -> list(
                                                 context,
-                                                context.getSource().getTextName()
+                                                context.getSource().getTextName().toLowerCase()
                                         )
                                 )
                         )
@@ -118,7 +133,7 @@ public class MacroCommand {
                                 .executes(
                                         context -> run(
                                                 context,
-                                                context.getSource().getTextName(),
+                                                context.getSource().getTextName().toLowerCase(),
                                                 null
                                         )
                                 )
@@ -126,7 +141,7 @@ public class MacroCommand {
                                         .executes(
                                                 context -> run(
                                                         context,
-                                                        context.getSource().getTextName(),
+                                                        context.getSource().getTextName().toLowerCase(),
                                                         StringArgumentType.getString(context, "variables")
                                                 )
                                         )
@@ -230,7 +245,9 @@ public class MacroCommand {
                         .then(argument("command number", IntegerArgumentType.integer(1))
                                 .suggests(MacroCommand::suggestCommandNumber)
                                 .then(argument("delay", TimeArgument.time())
+                                        .suggests(MacroCommand::suggestReplaceDelay)
                                         .then(argument("command", StringArgumentType.greedyString())
+                                                .suggests(MacroCommand::suggestReplaceCommand)
                                                 .executes(MacroCommand::editReplace)
                                         )
                                 )
@@ -249,11 +266,7 @@ public class MacroCommand {
                 )
                 .then(literal("transfer")
                         .then(literal("public")
-                                .executes(MacroCommand::editVisibilityPublic)
-                        )
-                        .then(argument("new owner", StringArgumentType.word())
-                                .suggests(MacroCommand::suggestOwner)
-                                .executes(MacroCommand::editVisibilityPrivate)
+                                .executes(MacroCommand::editTransferPublic)
                         )
                 );
 
@@ -275,7 +288,7 @@ public class MacroCommand {
     }
 
     private static CompletableFuture<Suggestions> suggestMine(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
-        Macro.listMacros(context.getSource().getTextName()).forEach(builder::suggest);
+        Macro.listMacros(context.getSource().getTextName().toLowerCase()).forEach(builder::suggest);
         return builder.buildFuture();
     }
 
@@ -294,11 +307,33 @@ public class MacroCommand {
         return builder.buildFuture();
     }
 
+    private static CompletableFuture<Suggestions> suggestReplaceDelay(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+        String macroName = StringArgumentType.getString(context, "name");
+        int commandNumber = IntegerArgumentType.getInteger(context, "command number");
+        String owner = getOwnerFromEditCommand(context);
+        Macro macro = new Macro(macroName, owner, true);
+        if (commandNumber > 0 && macro.actions.size() >= commandNumber) {
+            builder.suggest(macro.actions.get(commandNumber - 1).delay);
+        }
+        return builder.buildFuture();
+    }
+
+    private static CompletableFuture<Suggestions> suggestReplaceCommand(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+        String macroName = StringArgumentType.getString(context, "name");
+        int commandNumber = IntegerArgumentType.getInteger(context, "command number");
+        String owner = getOwnerFromEditCommand(context);
+        Macro macro = new Macro(macroName, owner, true);
+        if (commandNumber > 0 && macro.actions.size() >= commandNumber) {
+            builder.suggest(macro.actions.get(commandNumber - 1).command);
+        }
+        return builder.buildFuture();
+    }
+
     private static int create(CommandContext<CommandSourceStack> context){
         String macroName = StringArgumentType.getString(context, "name").toLowerCase();
         CommandSourceStack source = context.getSource();
 
-        if (Files.exists(macroPath(macroName, source.getTextName()))) {
+        if (Files.exists(macroPath(macroName, source.getTextName().toLowerCase()))) {
             source.sendSuccess(() -> Messenger.c("r Macro ", "ru " + macroName, "r  is already exist"), false);
             return 0;
         }
@@ -371,6 +406,30 @@ public class MacroCommand {
         return 1;
     }
 
+    private static int copy(CommandContext<CommandSourceStack> context, String owner) {
+        String macroName = StringArgumentType.getString(context, "name");
+        CommandSourceStack source = context.getSource();
+
+        if (!Macro.doesMacroExist(macroName, owner)) {
+            source.sendSuccess(() -> Messenger.c("r Macro ", "ru " + macroName, "r  does not exist"), false);
+            return 0;
+        }
+
+        if (Macro.doesMacroExist(macroName, source.getTextName().toLowerCase())) {
+            source.sendSuccess(() -> Messenger.c("r Macro ", "ru " + macroName, "r  is already exist"), false);
+            return 0;
+        }
+
+        Macro macro = new Macro(macroName, owner, true);
+
+        macro.owner = source.getTextName().toLowerCase();
+        macro.save();
+
+        source.sendSuccess(() -> Messenger.c("w Macro successfully copied"), false);
+
+        return 1;
+    }
+
     private static int list(CommandContext<CommandSourceStack> context, String owner) {
         List<String> macroNames = Macro.listMacros(owner);
         context.getSource().sendSuccess(() -> Messenger.c("w List of macros: " + macroNames), false);
@@ -383,7 +442,7 @@ public class MacroCommand {
             String visibilityType = nodes.get(2).getNode().getName();
             switch (visibilityType) {
                 case "mine":
-                    return context.getSource().getTextName();
+                    return context.getSource().getTextName().toLowerCase();
                 case "public":
                     return Macro.MACRO_PUBLIC_OWNER;
                 case "private":
@@ -480,15 +539,7 @@ public class MacroCommand {
         return 1;
     }
 
-    private static int editVisibilityPublic(CommandContext<CommandSourceStack> context) {
-        return editVisibility(context, MACRO_PUBLIC_OWNER);
-    }
-
-    private static int editVisibilityPrivate(CommandContext<CommandSourceStack> context) {
-        return editVisibility(context, StringArgumentType.getString(context, "new owner").toLowerCase());
-    }
-
-    private static int editVisibility(CommandContext<CommandSourceStack> context, String newOwner) {
+    private static int editTransferPublic(CommandContext<CommandSourceStack> context) {
         String macroName = StringArgumentType.getString(context, "name");
         CommandSourceStack source = context.getSource();
         String owner = getOwnerFromEditCommand(context);
@@ -503,24 +554,14 @@ public class MacroCommand {
             return 0;
         }
 
-        if (!Files.exists(MACROS_DIR.resolve(newOwner))) {
-            source.sendSuccess(() -> Messenger.c("r New owner does not exists"), false);
-            return 0;
-        }
-
         Macro macro = new Macro(macroName, owner, true);
 
-        if (macro.owner.equals(newOwner)) {
-            source.sendSuccess(() -> Messenger.c("r Macro already has this owner"), false);
-            return 0;
-        }
-
-        if (Macro.doesMacroExist(macroName, newOwner)) {
+        if (Macro.doesMacroExist(macroName, Macro.MACRO_PUBLIC_OWNER)) {
             source.sendSuccess(() -> Messenger.c("r Macro ", "ru " + macroName, "r  is already exist"), false);
             return 0;
         }
 
-        macro.owner = newOwner;
+        macro.owner = Macro.MACRO_PUBLIC_OWNER;
         macro.save();
 
         try {
@@ -530,7 +571,7 @@ public class MacroCommand {
             return 0;
         }
 
-        source.sendSuccess(() -> Messenger.c("w Macro owner is set to ", "wu " + newOwner), false);
+        source.sendSuccess(() -> Messenger.c("w This macro is now public"), false);
         return 1;
     }
 
